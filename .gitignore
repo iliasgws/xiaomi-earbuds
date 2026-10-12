@@ -1,0 +1,30 @@
+# Local research, device/account data, and vendor artifacts
+analysis-fresh/
+decompiled/
+FEATURE-NOTES.md
+TRANSPORT-NOTES.md
+*.apk
+*.apks
+*.xapk
+*.bin
+*.so
+*.zip
+
+# Python build/runtime files
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+
+# Android/Gradle and local signing/environment configuration
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.jks
+*.keystore
+captures/
