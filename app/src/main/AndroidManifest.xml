@@ -11,6 +11,7 @@
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:label="Buds"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Buds"

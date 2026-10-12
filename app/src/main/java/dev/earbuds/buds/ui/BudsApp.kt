@@ -9,6 +9,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headset
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Headset
+import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,9 +31,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.earbuds.buds.PairedEarbuds
 import dev.earbuds.buds.R
@@ -63,13 +72,16 @@ fun BudsApp(
             topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.ic_headphones),null,Modifier.size(25.dp),tint=MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp)); Text("Buds",fontWeight=FontWeight.SemiBold)
-            }},actions={Text(if (state.phase==ConnectionPhase.CONNECTED) "CONNECTED" else state.phase.name,
-                style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary,
-                modifier=Modifier.padding(end=24.dp))})},
+            }},actions={StatusChip(state.phase)})},
             bottomBar={NavigationBar {
-                listOf("Sound","Gestures","Device").forEachIndexed { index,title ->
+                val tabs = listOf(
+                    Triple("Sound", Icons.Outlined.GraphicEq, Icons.Filled.GraphicEq),
+                    Triple("Gestures", Icons.Outlined.TouchApp, Icons.Filled.TouchApp),
+                    Triple("Device", Icons.Outlined.Headset, Icons.Filled.Headset),
+                )
+                tabs.forEachIndexed { index, (title, outline, filled) ->
                     NavigationBarItem(selected=tab==index,onClick={tab=index},label={Text(title)},
-                        icon={Text(listOf("≋","↗","◉")[index],fontSize=24.sp)})
+                        icon={Icon(if (tab==index) filled else outline,contentDescription=title)})
                 }
             }},
         ) { padding ->
@@ -86,6 +98,21 @@ fun BudsApp(
                 Spacer(Modifier.height(20.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun StatusChip(phase: ConnectionPhase) {
+    val (label, tint) = when (phase) {
+        ConnectionPhase.CONNECTED -> "Connected" to MaterialTheme.colorScheme.primary
+        ConnectionPhase.CONNECTING -> "Connecting…" to MaterialTheme.colorScheme.onSurfaceVariant
+        ConnectionPhase.ERROR -> "Error" to MaterialTheme.colorScheme.error
+        else -> "Disconnected" to MaterialTheme.colorScheme.outline
+    }
+    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(end=20.dp)) {
+        Icon(Icons.Outlined.Circle,contentDescription=null,modifier=Modifier.size(8.dp),tint=tint)
+        Spacer(Modifier.width(6.dp))
+        Text(label,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -124,8 +151,9 @@ private fun BatteryCards(info: DeviceInfo?) {
                 colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     Text(title,style=MaterialTheme.typography.labelLarge)
-                    Text(battery?.let { "${it.percent}%" } ?: "—",style=MaterialTheme.typography.headlineSmall,
-                        fontWeight=FontWeight.SemiBold)
+            Text(battery?.let { "${it.percent}%" } ?: "—",style=MaterialTheme.typography.headlineSmall,
+                fontWeight=FontWeight.SemiBold,
+                modifier=Modifier.semantics { contentDescription="${title} battery ${battery?.percent?.let { "$it percent" } ?: "no data"}" })
                     Text(if (battery?.charging==true) "Charging" else "Battery",style=MaterialTheme.typography.labelSmall,
                         color=MaterialTheme.colorScheme.onSecondaryContainer)
                 }
@@ -185,7 +213,10 @@ private fun NoiseControls(snapshot: Snapshot, enabled: Boolean) {
             Slider(value=level.coerceIn(0f,maximum.toFloat()),onValueChange={level=it},enabled=enabled,
                 valueRange=0f..maximum.toFloat(),steps=maximum-1,
                 onValueChangeFinished={BudsRepository.command { noise(snapshot.mode,level.roundToInt()) }},
-                modifier=Modifier.semantics { contentDescription="${snapshot.mode.title} strength" })
+                modifier=Modifier.semantics {
+                    contentDescription="${snapshot.mode.title} strength"
+                    stateDescription="${level.roundToInt()+1} of ${maximum+1}"
+                })
             if (snapshot.mode==NoiseMode.ANC) {
                 SettingSwitch("Adaptive ANC",snapshot.adaptiveAnc,enabled) { BudsRepository.command { toggle(37,it) } }
                 SettingSwitch("Personalized ANC",snapshot.personalizedAnc,enabled) { BudsRepository.command { toggle(59,it) } }
@@ -223,7 +254,10 @@ private fun EqControls(snapshot: Snapshot, enabled: Boolean) {
                             valueRange=snapshot.profile.minGain.toFloat()..snapshot.profile.maxGain.toFloat(),
                             steps=(snapshot.profile.maxGain-snapshot.profile.minGain-1).coerceAtLeast(0),
                             onValueChange={value -> gains=gains.mapIndexed { i,g -> if(i==index) value.roundToInt() else g }},
-                            modifier=Modifier.semantics { contentDescription="${band.frequency} Hz gain" })
+                            modifier=Modifier.semantics {
+                                contentDescription="${band.frequency} Hz gain"
+                                stateDescription="${gains[index]} dB"
+                            })
                         Text(if (band.frequency>=1000) "${band.frequency/1000}k" else "${band.frequency}",
                             style=MaterialTheme.typography.labelSmall)
                     }
@@ -267,7 +301,10 @@ private fun GesturePicker(title: String, selected: GestureAction, choices: List<
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
         Text(title,style=MaterialTheme.typography.bodyLarge)
         Box {
-            FilledTonalButton(enabled=enabled,onClick={expanded=true}) { Text(selected.title+" ▾") }
+            FilledTonalButton(enabled=enabled,onClick={expanded=true}) {
+                Text(selected.title); Spacer(Modifier.width(4.dp))
+                Icon(Icons.Filled.ArrowDropDown,contentDescription=null)
+            }
             DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
                 choices.forEach { option ->
                     DropdownMenuItem(text={Text(option.title)},onClick={expanded=false;change(option)})
@@ -301,7 +338,10 @@ private fun DevicePage(
         } else {
             Box(Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick={expanded=true},enabled=!connected && state.phase!=ConnectionPhase.CONNECTING,
-                    modifier=Modifier.fillMaxWidth()) { Text((chosen?.name ?: "Choose earbuds")+" ▾") }
+                    modifier=Modifier.fillMaxWidth()) {
+                    Text(chosen?.name ?: "Choose earbuds"); Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Filled.ArrowDropDown,contentDescription=null)
+                }
                 DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
                     devices.forEach { device -> DropdownMenuItem(text={Text(device.name)},
                         onClick={chosen=device;expanded=false}) }
@@ -317,7 +357,7 @@ private fun DevicePage(
     SectionCard("Live status","Battery and listening mode, without opening the app.") {
         Text(when {
             !notificationsAllowed -> "Notifications are disabled. Allow them to see ongoing earbud status."
-            Build.VERSION.SDK_INT<36 -> "Ongoing connection notification is available on this Android version."
+            Build.VERSION.SDK_INT<36 -> "Live Updates need Android 16. You'll still get a standard ongoing notification."
             promotedAllowed -> "Live Updates are allowed. Android decides when the status chip is shown."
             else -> "Enable Live Updates in Android's notification settings for the promoted status chip."
         },style=MaterialTheme.typography.bodyMedium)
