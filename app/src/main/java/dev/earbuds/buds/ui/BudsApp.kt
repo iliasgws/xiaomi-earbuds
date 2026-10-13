@@ -1,12 +1,12 @@
 package dev.earbuds.buds.ui
 
 import android.os.Build
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,11 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -70,7 +66,8 @@ fun BudsApp(
         Scaffold(
             snackbarHost={SnackbarHost(snackbar)},
             topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_headphones),null,Modifier.size(25.dp),tint=MaterialTheme.colorScheme.primary)
+                Icon(painterResource(if (dark) R.drawable.ic_makealight_light else R.drawable.ic_makealight_black),
+                    null,Modifier.size(25.dp),tint=Color.Unspecified)
                 Spacer(Modifier.width(12.dp)); Text("Buds",fontWeight=FontWeight.SemiBold)
             }},actions={StatusChip(state.phase)})},
             bottomBar={NavigationBar {
@@ -118,16 +115,12 @@ private fun StatusChip(phase: ConnectionPhase) {
 
 @Composable
 private fun EarbudsArtwork() {
-    val primary=MaterialTheme.colorScheme.primary
-    val container=MaterialTheme.colorScheme.primaryContainer
-    Canvas(Modifier.size(116.dp).semantics { contentDescription="Earbuds illustration" }) {
-        drawCircle(container,radius=size.minDimension/2)
-        val w=size.width; val h=size.height
-        for ((x,angle) in listOf(.32f to -18f,.68f to 18f)) rotate(angle,Offset(w*x,h*.5f)) {
-            drawRoundRect(primary,Offset(w*(x-.055f),h*.40f),Size(w*.11f,h*.37f),CornerRadius(w*.055f))
-            drawOval(primary,Offset(w*(x-.13f),h*.22f),Size(w*.25f,h*.25f))
-            drawOval(container,Offset(w*(x-.075f),h*.28f),Size(w*.10f,h*.09f))
-        }
+    Box(Modifier.size(116.dp).background(MaterialTheme.colorScheme.primaryContainer,CircleShape)
+        .semantics { contentDescription="Earbuds illustration" },contentAlignment=Alignment.Center) {
+        Icon(
+            painterResource(if (isSystemInDarkTheme()) R.drawable.ic_makealight_light else R.drawable.ic_makealight_black),
+            contentDescription=null,modifier=Modifier.size(66.dp),tint=Color.Unspecified,
+        )
     }
 }
 

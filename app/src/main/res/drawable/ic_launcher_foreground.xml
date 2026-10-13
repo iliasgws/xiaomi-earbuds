@@ -1,10 +1,10 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:scaleX="2.2" android:scaleY="2.2" android:translateX="27.6" android:translateY="27.6">
-        <path android:strokeColor="#D2F3DD" android:strokeWidth="2"
-            android:strokeLineCap="round" android:fillColor="#00000000"
-            android:pathData="M4,14 L4,11 C4,6.6 7.6,3 12,3 C16.4,3 20,6.6 20,11 L20,14" />
-        <path android:fillColor="#D2F3DD"
-            android:pathData="M4,12 C2.9,12 2,12.9 2,14 L2,18 C2,19.1 2.9,20 4,20 L7,20 L7,12 Z M17,12 L17,20 L20,20 C21.1,20 22,19.1 22,18 L22,14 C22,12.9 21.1,12 20,12 Z" />
-    </group>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
+  <group android:translateX="106" android:translateY="106" android:scaleX="0.586" android:scaleY="0.586">
+    <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:fillType="evenOdd" android:pathData="M 193 54 C 165 23 122 14 90 27 C 48 42 29 76 37 121 C 43 158 69 189 101 208 C 103 204 91 185 95 152 C 100 104 139 58 193 54 Z"/>
+    <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:fillType="evenOdd" android:pathData="M 197 81 C 231 77 254 101 261 136 C 272 182 245 220 201 232 C 166 242 139 228 128 202 C 111 162 125 119 152 99 C 165 89 182 83 197 81 Z M 225 131 C 208 130 192 150 185 172 C 179 190 183 204 194 205 C 210 205 226 186 233 165 C 240 145 237 133 225 131 Z"/>
+    <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:fillType="evenOdd" android:pathData="M 321 158 C 346 134 383 122 415 128 C 456 135 477 166 478 205 C 479 249 451 290 412 313 C 425 271 419 234 397 201 C 377 173 352 161 321 158 Z"/>
+    <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:fillType="evenOdd" android:pathData="M 306 185 C 344 180 375 207 387 241 C 402 284 386 323 359 335 C 327 350 288 333 268 307 C 244 277 245 239 263 212 C 273 197 288 188 306 185 Z M 289 236 C 276 236 272 250 278 271 C 284 290 300 308 315 309 C 330 311 335 297 328 277 C 322 257 305 236 289 236 Z"/>
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.4" android:fillType="evenOdd" android:pathData="M 76 225 C 104 240 137 251 167 257 C 169 283 169 313 168 337 C 168 368 154 384 126 386 C 94 386 77 369 76 337 C 75 302 77 260 76 225 Z"/>
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.4" android:fillType="evenOdd" android:pathData="M 344 362 C 376 356 412 345 437 330 L 437 436 C 437 472 421 489 391 491 C 361 490 345 472 344 439 Z"/>
+  </group>
 </vector>

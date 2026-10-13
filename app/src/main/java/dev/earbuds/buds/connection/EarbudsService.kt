@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import dev.earbuds.buds.protocol.EarbudsSession
+import dev.earbuds.buds.protocol.NoiseMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,12 @@ class EarbudsService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action==DISCONNECT) {
             disconnect(); stopSelf(); return START_NOT_STICKY
+        }
+        if (intent?.action==NOISE) {
+            val code=intent.getIntExtra(NOISE_MODE,-1)
+            val mode=NoiseMode.entries.firstOrNull { it.code==code } ?: return START_NOT_STICKY
+            scope.launch { BudsRepository.command { noise(mode) } }
+            return START_NOT_STICKY
         }
         val address=intent?.getStringExtra(ADDRESS) ?: return START_NOT_STICKY
         disconnect()
@@ -86,6 +93,8 @@ class EarbudsService : Service() {
     companion object {
         const val CONNECT="dev.earbuds.buds.CONNECT"
         const val DISCONNECT="dev.earbuds.buds.DISCONNECT"
+        const val NOISE="dev.earbuds.buds.NOISE"
         const val ADDRESS="address"
+        const val NOISE_MODE="mode"
     }
 }

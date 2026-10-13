@@ -1,56 +1,100 @@
 package dev.earbuds.buds.connection
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import dev.earbuds.buds.MainActivity
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import dev.earbuds.buds.R
+import dev.earbuds.buds.protocol.NoiseMode
 
 class LiveStatus(private val context: Context) {
-    private val manager=context.getSystemService(NotificationManager::class.java)
+    private val channel=NotificationChannel(CHANNEL,"Earbud live status",NotificationManager.IMPORTANCE_LOW)
+        .apply { setShowBadge(false) }
+
     init {
-        manager.createNotificationChannel(NotificationChannel(CHANNEL,"Earbud live status",
-            NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description="Connection, battery and listening mode while your earbuds are connected"
-            setSound(null,null); enableVibration(false)
-        })
+        val manager=context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
     }
+
     fun notification(state: BudsState): Notification {
-        val open=PendingIntent.getActivity(context,0,Intent(context,MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val disconnect=PendingIntent.getService(context,1,
-            Intent(context,EarbudsService::class.java).setAction(EarbudsService.DISCONNECT),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        if (ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)
+            !=PackageManager.PERMISSION_GRANTED) return NotificationCompat.Builder(context,CHANNEL).build()
         val snapshot=state.snapshot
-        val title=if (state.phase==ConnectionPhase.CONNECTING) "Connecting to your earbuds" else "Redmi Buds 6 Pro"
         val left=snapshot?.info?.left?.percent
         val right=snapshot?.info?.right?.percent
-        val battery=listOfNotNull(left,right).average().takeUnless { it.isNaN() }?.toInt() ?: 0
-        val status=snapshot?.let {
-            "L ${left?.toString() ?: "—"}% · R ${right?.toString() ?: "—"}% · Case ${it.info.case?.percent ?: "—"}% · ${it.mode.title}"
-        } ?: "Establishing a secure Bluetooth control session"
+        val mode=snapshot?.mode
+        val battery=when {
+            left!=null&&right!=null -> (left+right)/2
+            left!=null -> left
+            right!=null -> right
+            else -> 0
+        }
+        val status=when {
+            left==null&&right==null -> "Buds not reporting"
+            left==null -> "L · R ${right}%"
+            right==null -> "L ${left}% · R"
+            else -> "L ${left}% · R ${right}%"
+        }
+        val title=if (state.phase==ConnectionPhase.CONNECTED) "Redmi Buds 6 Pro"
+            else "Connecting to your earbuds"
         val builder=NotificationCompat.Builder(context,CHANNEL)
-            .setSmallIcon(R.drawable.ic_headphones)
-            .setContentTitle(title).setContentText(status).setContentIntent(open)
-            .setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(0,"Disconnect",disconnect)
-            .setRequestPromotedOngoing(true)
+            .setSmallIcon(R.drawable.ic_makealight_mono)
+            .setContentTitle(title)
+            .setContentText(status)
+            .setSubText(mode?.title)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setSilent(true)
+        if (snapshot!=null&&state.phase==ConnectionPhase.CONNECTED) {
+            for (m in NoiseMode.entries) {
+                val intent=Intent(context,EarbudsService::class.java)
+                    .setAction(EarbudsService.NOISE)
+                    .putExtra(EarbudsService.NOISE_MODE,m.code)
+                val pending=PendingIntent.getService(context,200+m.code,intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                builder.addAction(0,m.title,pending)
+            }
+        }
         if (Build.VERSION.SDK_INT>=36) {
-            builder.setShortCriticalText(if (snapshot==null) "Buds" else "$battery%")
-            builder.setStyle(NotificationCompat.ProgressStyle()
-                .setProgressSegments(listOf(NotificationCompat.ProgressStyle.Segment(100).setColor(Color.rgb(53,107,87))))
-                .setProgress(battery).setProgressIndeterminate(snapshot==null))
-        } else builder.setProgress(100,battery,snapshot==null)
+            val critical=when {
+                left==null&&right!=null -> "$right%"
+                right==null&&left!=null -> "$left%"
+                left!=null&&right!=null -> "$left%·$right%"
+                else -> "—"
+            }
+            builder.setShortCriticalText(critical)
+            val style=NotificationCompat.ProgressStyle().setProgressIndeterminate(false)
+            val green=android.graphics.Color.parseColor("#356B57")
+            if (left!=null&&right!=null) {
+                style.addProgressSegment(NotificationCompat.ProgressStyle.Segment(left).setColor(green))
+                style.addProgressSegment(NotificationCompat.ProgressStyle.Segment(right).setColor(green))
+            } else {
+                style.addProgressSegment(NotificationCompat.ProgressStyle.Segment(battery).setColor(green))
+            }
+            builder.setStyle(style)
+        } else {
+            builder.setProgress(100,battery,snapshot==null)
+        }
         return builder.build()
     }
-    fun update(state: BudsState) { manager.notify(ID,notification(state)) }
-    companion object { const val CHANNEL="buds_live_status"; const val ID=76 }
+
+    fun update(state: BudsState) {
+        if (ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)
+            !=PackageManager.PERMISSION_GRANTED) return
+        NotificationManagerCompat.from(context).notify(ID,notification(state))
+    }
+
+    companion object {
+        const val CHANNEL="live"
+        const val ID=1
+    }
 }
