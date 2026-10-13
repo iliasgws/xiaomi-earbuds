@@ -51,6 +51,7 @@ class LiveStatus(private val context: Context) {
             .setContentText(status)
             .setSubText(mode?.title)
             .setOngoing(true)
+            .setRequestPromotedOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setSilent(true)
