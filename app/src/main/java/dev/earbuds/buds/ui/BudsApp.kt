@@ -365,6 +365,14 @@ private fun DevicePage(
             modifier=Modifier.fillMaxWidth()) { Text(if (notificationsAllowed) "Live Update settings" else "Allow notifications") }
     }
     SectionCard("Made for your sound") {
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
+            Icon(
+                painterResource(if (isSystemInDarkTheme()) R.drawable.ic_makealight_light else R.drawable.ic_makealight_black),
+                contentDescription=null,
+                modifier=Modifier.size(96.dp),
+                tint=Color.Unspecified,
+            )
+        }
         Text("Material You colors follow your wallpaper. Controls use the verified Redmi Buds 6 Pro protocol.",
             style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
