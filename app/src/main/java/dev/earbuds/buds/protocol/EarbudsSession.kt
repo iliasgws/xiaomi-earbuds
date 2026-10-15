@@ -2,6 +2,8 @@ package dev.earbuds.buds.protocol
 
 import java.security.MessageDigest
 import java.security.SecureRandom
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -24,8 +26,11 @@ class EarbudsSession(
     private var authenticated=false
     private var peerChallenge=false
     private var peerVerified=false
-    private var globalModelVerified=false
+    private var modelVerified=false
     private val cached=mutableMapOf<Int,ByteArray>()
+    /** Firmware region of the connected earbuds, or null before authentication. */
+    var region: Region?=null; private set
+    private var installedVersion: String?=null
 
     override fun close() { authenticated=false; wire.close() }
     private suspend fun next(): Packet {
@@ -97,13 +102,14 @@ class EarbudsSession(
             }
             authenticated=true
             val info=targetInfo(request(2,hex("ffffffff")))
-            if (info.vid!=0x2717 || info.pid!=0x509e)
-                throw ProtocolException("This profile requires global Redmi Buds 6 Pro (2717:509E)")
-            globalModelVerified=true
+            if (info.vid!=0x2717) throw ProtocolException("This profile requires Redmi Buds 6 Pro (2717)")
+            region=Region.from(info.pid)
+            installedVersion=info.firmware
+            modelVerified=true
         } catch (error: Exception) { close(); throw error }
     }
     private fun ready() {
-        check(authenticated && globalModelVerified) { "Connect and authenticate first" }
+        check(authenticated && modelVerified) { "Connect and authenticate first" }
     }
     private suspend fun configs(ids: List<Int>): Map<Int,ByteArray> {
         val result=configValues(request(0xf3,configIds(ids)))
@@ -114,6 +120,7 @@ class EarbudsSession(
     suspend fun snapshot(): Snapshot = mutex.withLock {
         ready()
         val info=targetInfo(request(2,hex("ffffffff")))
+        installedVersion=info.firmware
         val values=configs(listOf(11,7,2,37,59,41,55))
         val noise=values.getValue(11)
         if (noise.size!=2) throw ProtocolException("Invalid noise report")
@@ -161,5 +168,53 @@ class EarbudsSession(
         val bands=profile.bands.zip(gains) { band,gain -> band.copy(gain=gain) }
         set(55,customEqValue(bands,preview=false))
         if (eqProfile(configs(listOf(55)).getValue(55)).bands!=bands) throw ProtocolException("Custom EQ readback differs")
+    }
+
+    /**
+     * Stream an OTA image using the official RCSP sequence:
+     * 0xE1 offset → 0xE2 inquire → 0xE3 enter → 0xE5 block loop → 0xE6 status → 0x03 reboot.
+     * The header is patched for this device's PID (and forced past a downgrade)
+     * by [OtaImage.prepare]. [onFlashed] runs while the session lock is still
+     * held, after the device has confirmed the update but before the reboot.
+     */
+    suspend fun flash(image: ByteArray, onProgress: (Int) -> Unit = {}, onFlashed: () -> Unit = {}) = mutex.withLock {
+        ready()
+        val device=region ?: throw ProtocolException("Earbuds region is unknown")
+        val prepared=OtaImage.prepare(image,device.pid,installedVersion)
+        onProgress(0)
+        val offsetInfo=request(0xe1,byteArrayOf())
+        if (offsetInfo.size!=6) throw OtaException("Unexpected update-file-offset response")
+        val flagOffset=offsetInfo.be32(0); val flagLength=offsetInfo.be16(4)
+        if (flagOffset<0 || flagLength<=0 || flagOffset+flagLength>prepared.size)
+            throw OtaException("Earbuds requested an out-of-range firmware flag")
+        val inquire=request(0xe2,prepared.copyOfRange(flagOffset,flagOffset+flagLength))
+        if (inquire.size!=1 || inquire[0].u()!=0)
+            throw OtaException("Earbuds rejected the firmware image (${inquire.getOrNull(0)?.u() ?: -1})")
+        val enter=request(0xe3,byteArrayOf())
+        if (enter.size !in 7..8 || enter[0].u()!=0)
+            throw OtaException("Earbuds refused update mode (${enter.getOrNull(0)?.u() ?: -1})")
+        val withCrc=enter.size==8 && enter[7].u()!=0
+        var offset=enter.be32(1); var length=enter.be16(5); var blocks=0
+        while (true) {
+            if (offset<0 || length<=0 || offset+length>prepared.size)
+                throw OtaException("Earbuds requested an invalid firmware block")
+            val block=prepared.copyOfRange(offset,offset+length)
+            val reply=request(0xe5,if (withCrc) block+crc32be(block) else block)
+            if (reply.size !in 7..9 || reply[0].u()!=0)
+                throw OtaException("Firmware block transfer failed (${reply.getOrNull(0)?.u() ?: -1})")
+            onProgress(((offset+length)*100L/prepared.size).toInt().coerceAtMost(99))
+            val nextOffset=reply.be32(1); val nextLength=reply.be16(5)
+            if (nextOffset==0 && nextLength==0) break
+            if (reply.size==9) { val wait=reply.be16(7); if (wait>0) delay(wait.toLong()) }
+            offset=nextOffset; length=nextLength
+            if (++blocks>100_000) throw OtaException("Firmware transfer did not converge")
+        }
+        val status=request(0xe6,byteArrayOf())
+        if (status.size!=1 || status[0].u()!=0)
+            throw OtaException("Final update status failed (${status.getOrNull(0)?.u() ?: -1})")
+        onProgress(100); onFlashed()
+        try { request(0x03,byteArrayOf(0)) }
+        catch (error: CancellationException) { throw error }
+        catch (_: Exception) { /* the earbuds reboot and drop the link */ }
     }
 }

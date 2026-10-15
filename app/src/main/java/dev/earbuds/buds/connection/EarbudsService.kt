@@ -64,13 +64,22 @@ class EarbudsService : Service() {
                 try {
                     while (true) {
                         delay(15_000)
+                        val current=BudsRepository.state.value
+                        if (current.ota!=null) continue
+                        if (current.phase!=ConnectionPhase.CONNECTED) break
                         BudsRepository.snapshot(session.snapshot())
                     }
                 } finally { notifications.cancel() }
+                // The phase left CONNECTED without an I/O failure: the flash finished.
+                BudsRepository.session=null
+                if (BudsRepository.consumeFlashCompletion()) BudsRepository.flashSucceeded()
+                stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) {
+                val flashed=BudsRepository.consumeFlashCompletion()
                 BudsRepository.session=null
-                BudsRepository.update(BudsState(ConnectionPhase.ERROR,message=
+                if (flashed) BudsRepository.flashSucceeded()
+                else BudsRepository.update(BudsState(ConnectionPhase.ERROR,message=
                     (error.message ?: "Connection failed")+". Close Xiaomi Earbuds if its control session is still open."))
                 stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
             } finally {
@@ -87,7 +96,8 @@ class EarbudsService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
     override fun onDestroy() {
-        disconnect(resetState=BudsRepository.state.value.phase!=ConnectionPhase.ERROR)
+        disconnect(resetState=BudsRepository.state.value.phase!=ConnectionPhase.ERROR &&
+            !BudsRepository.state.value.justFlashed)
         scope.cancel(); super.onDestroy()
     }
     companion object {

@@ -26,6 +26,14 @@ enum class GestureAction(val code: Int, val title: String) {
     companion object { fun from(code: Int) = entries.firstOrNull { it.code==code }
         ?: throw ProtocolException("Unsupported gesture action $code") }
 }
+enum class Region(val pid: Int, val title: String) {
+    GLOBAL(0x509e, "Global"), CHINA(0x509d, "China");
+    companion object {
+        fun fromOrNull(pid: Int) = entries.firstOrNull { it.pid == pid }
+        fun from(pid: Int) = fromOrNull(pid)
+            ?: throw ProtocolException("Unsupported earbuds PID 2717:${pid.toString(16).uppercase().padStart(4,'0')}")
+    }
+}
 data class Battery(val percent: Int, val charging: Boolean)
 data class DeviceInfo(
     val name: String, val firmware: String, val vid: Int, val pid: Int,

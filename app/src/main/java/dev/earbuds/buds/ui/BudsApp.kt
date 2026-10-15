@@ -308,6 +308,60 @@ private fun GesturePicker(title: String, selected: GestureAction, choices: List<
 }
 
 @Composable
+private fun RegionSection(state: BudsState) {
+    val context=LocalContext.current
+    val info=state.snapshot?.info
+    val current=info?.pid?.let(Region::fromOrNull)
+    SectionCard("Region & firmware","Beta · switch the earbuds between global and China ROMs") {
+        Text("Current: ${current?.title ?: "—"} ROM · Firmware ${info?.firmware ?: "—"} · " +
+            "PID2717:${(info?.pid ?: 0).toString(16).uppercase().padStart(4,'0')}",
+            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        val ota=state.ota
+        when {
+            ota!=null -> {
+                LinearProgressIndicator(progress={ota.progress/100f},modifier=Modifier.fillMaxWidth())
+                Text("${ota.stage} · ${ota.progress}%",style=MaterialTheme.typography.bodyMedium)
+                Text("Keep the buds in the open case next to the phone until this finishes.",
+                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            state.phase!=ConnectionPhase.CONNECTED || current==null -> {
+                Text("Connect your earbuds to switch firmware regions.",
+                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> {
+                val target=Region.entries.first { it!=current }
+                val catalog=FirmwareCatalog.forRegion(target)
+                var confirming by remember(current,info?.firmware) { mutableStateOf(false) }
+                FilledTonalButton(onClick={confirming=true},enabled=!state.busy,modifier=Modifier.fillMaxWidth()) {
+                    Text("Switch to ${target.title} ROM (${catalog.version})")
+                }
+                if (confirming) AlertDialog(
+                    onDismissRequest={confirming=false},
+                    title={Text("Switch to ${target.title} ROM?")},
+                    text={
+                        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text("This flashes ${target.title} ROM ${catalog.version} " +
+                                "(${catalog.size/1024/1024} MB) over your current ${current.title} ROM. " +
+                                "The switch is experimental and is usually one-way: once the other region's " +
+                                "version is installed, the earbuds may refuse the original ROM as a downgrade.")
+                            Text("· Charge the case above 50% and keep the lid open")
+                            Text("· Keep the phone next to the case and do not use the earbuds")
+                            Text("· Never open Bluetooth settings or the Xiaomi app during the flash")
+                        }
+                    },
+                    confirmButton={
+                        Button(onClick={confirming=false;BudsRepository.flash(context.cacheDir,target)}) {
+                            Text("Flash ${target.title} ROM")
+                        }
+                    },
+                    dismissButton={ TextButton(onClick={confirming=false}) { Text("Cancel") } },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DevicePage(
     state: BudsState, devices: List<PairedEarbuds>, bluetoothAllowed: Boolean,
     notificationsAllowed: Boolean, promotedAllowed: Boolean, savedAddress: String?,
@@ -320,7 +374,7 @@ private fun DevicePage(
         mutableStateOf(devices.firstOrNull { it.address==savedAddress } ?: devices.firstOrNull())
     }
     var expanded by remember { mutableStateOf(false) }
-    SectionCard("Connection","Global Redmi Buds 6 Pro · local Bluetooth control") {
+    SectionCard("Connection","Redmi Buds 6 Pro · local Bluetooth control") {
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) { EarbudsArtwork() }
         if (!bluetoothAllowed) {
             Text("Allow Nearby devices so Buds can connect to your paired earphones.")
@@ -345,8 +399,13 @@ private fun DevicePage(
                 Text(if (connected) "Disconnect" else if (state.phase==ConnectionPhase.CONNECTING) "Cancel connection" else "Connect earbuds")
             }
         }
-        state.snapshot?.let { Text("Firmware ${it.info.firmware} · 2717:509E",style=MaterialTheme.typography.bodySmall) }
+        state.snapshot?.let {
+            val pid=it.info.pid.toString(16).uppercase().padStart(4,'0')
+            Text("Firmware ${it.info.firmware} · 2717:$pid · ${Region.fromOrNull(it.info.pid)?.title ?: "?"} ROM",
+                style=MaterialTheme.typography.bodySmall)
+        }
     }
+    RegionSection(state)
     SectionCard("Live status","Battery and listening mode, without opening the app.") {
         Text(when {
             !notificationsAllowed -> "Notifications are disabled. Allow them to see ongoing earbud status."

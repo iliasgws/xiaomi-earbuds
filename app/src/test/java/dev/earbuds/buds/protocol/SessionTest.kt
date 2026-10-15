@@ -43,12 +43,23 @@ class SessionTest {
         try { EarbudsSession(wire,{factor},10).authenticate(); fail("Expected timeout") }
         catch (_: kotlinx.coroutines.TimeoutCancellationException) { assertTrue(wire.closed) }
     }
+    @Test fun chinaModelIsAcceptedWithItsRegion() = runTest {
+        val china=ProtocolTest.TARGET_PAYLOAD.copyOf().also {
+            val identity=hex("2717509e")
+            val offset=(0..it.size-4).first { p -> it.copyOfRange(p,p+4).contentEquals(identity) }
+            it[offset+3]=0x9d.toByte()
+        }
+        val records=handshake().dropLast(1)+Packet(4,2,2,china).encode()
+        val client=EarbudsSession(ScriptWire(records),{factor})
+        client.authenticate()
+        assertEquals(Region.CHINA,client.region)
+    }
     @Test fun unsupportedDeviceCannotBeControlled() = runTest {
         val wrong=ProtocolTest.TARGET_PAYLOAD.copyOf().also {
             // Replace identity attribute PID while preserving every framing byte.
             val identity=hex("2717509e")
             val offset=(0..it.size-4).first { p -> it.copyOfRange(p,p+4).contentEquals(identity) }
-            it[offset+3]=0x9d.toByte()
+            it[offset+3]=0x00.toByte()
         }
         val records=handshake().dropLast(1)+Packet(4,2,2,wrong).encode()
         val wire=ScriptWire(records)
