@@ -102,7 +102,7 @@ class OtaFlashTest {
         val image=synthetic(0x509d,"1.1.9.9",500)
         val records=handshake()+listOf(
             response(0xe1,3,be32Bytes(0)+be16Bytes(0x60)),           // flag = header[0,96)
-            response(0xe2,4,byteArrayOf(0)),                          // can update
+            response(0xe2,4,byteArrayOf(3)),                          // official client continues on encrypted-key warning
             response(0xe3,5,byteArrayOf(0)+be32Bytes(0)+be16Bytes(300)+byteArrayOf(1)), // CRC on
             response(0xe5,6,byteArrayOf(0)+be32Bytes(300)+be16Bytes(456)+be16Bytes(0)),
             response(0xe5,7,byteArrayOf(0)+be32Bytes(0)+be16Bytes(0)),
@@ -144,7 +144,7 @@ class OtaFlashTest {
         assertFalse(wire.closed)
     }
 
-    @Test fun stopsBeforeUpdateModeWhenInquiryIsRefused() = runTest {
+    @Test fun stopsBeforeUpdateModeWhenInquiryReportsLowBattery() = runTest {
         val image=synthetic(0x509d,"1.1.9.9",500)
         val records=handshake()+listOf(
             response(0xe1,3,be32Bytes(0)+be16Bytes(0x60)),

@@ -188,7 +188,10 @@ class EarbudsSession(
         if (flagOffset<0 || flagLength<=0 || flagOffset+flagLength>prepared.size)
             throw OtaException("Earbuds requested an out-of-range firmware flag")
         val inquire=request(0xe2,prepared.copyOfRange(flagOffset,flagOffset+flagLength))
-        if (inquire.size!=1 || inquire[0].u()!=0)
+        // Xiaomi's own DeviceOtaManager treats result 3 (encrypted key mismatch)
+        // as a warning and still issues EnterUpdateMode (0xE3). Other nonzero
+        // results are fatal (notably 1 = low battery).
+        if (inquire.size!=1 || inquire[0].u() !in listOf(0,3))
             throw OtaException("Earbuds rejected the firmware image (${inquire.getOrNull(0)?.u() ?: -1})")
         val enter=request(0xe3,byteArrayOf())
         if (enter.size !in 7..8 || enter[0].u()!=0)
