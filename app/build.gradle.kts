@@ -11,8 +11,8 @@ android {
         applicationId = "dev.earbuds.buds"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.0.0"
+        versionCode = 9
+        versionName = "1.0.1-hotfix"
     }
     buildFeatures {
         compose = true
