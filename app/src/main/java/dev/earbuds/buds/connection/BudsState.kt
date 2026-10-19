@@ -49,6 +49,7 @@ object BudsRepository {
                 val snapshot=active.snapshot()
                 if (session===active) mutable.update { it.copy(snapshot=snapshot,busy=false) }
             } catch (error: Exception) {
+                if (dev.earbuds.buds.BuildConfig.DEBUG) android.util.Log.w("BudsCommand", "Earbud command failed", error)
                 if (session===active) mutable.update { it.copy(busy=false,message=error.message ?: "Command failed") }
             }
         }
@@ -76,6 +77,7 @@ object BudsRepository {
                     onFlashed={ flashCompleted=true })
                 flashSucceeded()
             } catch (error: Exception) {
+                if (dev.earbuds.buds.BuildConfig.DEBUG) android.util.Log.w("BudsFirmware", "Firmware operation failed", error)
                 mutable.update { it.copy(busy=false,ota=null,message=error.message ?: "Flashing failed") }
             } finally {
                 synchronized(this) { flashing=false }

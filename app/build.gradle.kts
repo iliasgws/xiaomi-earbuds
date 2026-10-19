@@ -28,7 +28,19 @@ kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 
+// Keep a descriptive installable artifact alongside AGP's standard output.
+val liquidGlassApk by tasks.registering(Copy::class) {
+    from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+    into(layout.buildDirectory.dir("outputs/apk/liquid-glass"))
+    rename { "Buds-Liquid-Glass.apk" }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy(liquidGlassApk)
+}
+
 dependencies {
+    implementation("io.github.kyant0:backdrop:1.0.0")
+    implementation("io.github.kyant0:capsule:2.1.1")
     implementation(platform("androidx.compose:compose-bom:2025.10.01"))
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.compose.material3:material3")

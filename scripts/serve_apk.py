@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import shutil
 
-DEFAULT_APK = Path(__file__).resolve().parents[1] / "app/build/outputs/apk/debug/app-debug.apk"
+DEFAULT_APK = Path(__file__).resolve().parents[1] / "app/build/outputs/apk/liquid-glass/Buds-Liquid-Glass.apk"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -20,7 +20,7 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(False)
 
     def respond(self, body):
-        if self.path != "/buds.apk":
+        if self.path not in ("/buds.apk", "/Buds-Liquid-Glass.apk"):
             self.send_error(404)
             return
         try:
@@ -31,7 +31,7 @@ class Handler(BaseHTTPRequestHandler):
         with source:
             self.send_response(200)
             self.send_header("Content-Type", "application/vnd.android.package-archive")
-            self.send_header("Content-Disposition", 'attachment; filename="Buds-0.1.0-debug.apk"')
+            self.send_header("Content-Disposition", 'attachment; filename="Buds-Liquid-Glass.apk"')
             self.send_header("Content-Length", str(self.apk.stat().st_size))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
@@ -46,5 +46,5 @@ if __name__ == "__main__":
     parser.add_argument("--apk", type=Path, default=DEFAULT_APK)
     args = parser.parse_args()
     apk = args.apk.resolve(strict=True)
-    print(f"APK available at http://{args.bind}:{args.port}/buds.apk", flush=True)
+    print(f"APK available at http://{args.bind}:{args.port}/Buds-Liquid-Glass.apk", flush=True)
     ThreadingHTTPServer((args.bind, args.port), partial(Handler, apk=apk)).serve_forever()

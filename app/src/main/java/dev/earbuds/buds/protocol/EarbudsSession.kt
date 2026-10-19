@@ -28,6 +28,8 @@ class EarbudsSession(
     private var peerVerified=false
     private var modelVerified=false
     private val cached=mutableMapOf<Int,ByteArray>()
+    /** Last ACKed noise setting; this model's config 11 readback is unreliable. */
+    private var appliedNoise: Pair<NoiseMode,Int>?=null
     /** Firmware region of the connected earbuds, or null before authentication. */
     var region: Region?=null; private set
     private var installedVersion: String?=null
@@ -124,26 +126,32 @@ class EarbudsSession(
         val values=configs(listOf(11,7,2,37,59,41,55))
         val noise=values.getValue(11)
         if (noise.size!=2) throw ProtocolException("Invalid noise report")
+        // Prefer the last ACKed noise setting: readback on this model lags or differs.
+        val (mode,level)=appliedNoise ?: (NoiseMode.from(noise[0].u()) to noise[1].u())
         fun one(id: Int): Int {
             val value=values.getValue(id)
             if (value.size!=1) throw ProtocolException("Invalid config $id value")
             return value[0].u()
         }
-        Snapshot(info,NoiseMode.from(noise[0].u()),noise[1].u(),EqPreset.from(one(7)),
+        Snapshot(info,mode,level,EqPreset.from(one(7)),
             eqProfile(values.getValue(55)),gestureValues(values.getValue(2)),
             one(37)!=0,one(59)!=0,one(41)!=0)
     }
     suspend fun noise(mode: NoiseMode, level: Int? = null) = mutex.withLock {
         ready()
         require(level==null || (mode!=NoiseMode.OFF && level in 0..if (mode==NoiseMode.ANC) 19 else 2))
+        // The ACK (status 0) is authoritative: these buds apply the change but report a
+        // different config 11 value, so readback must not fail the command.
         request(8,byteArrayOf(2,4,mode.code.toByte()))
         if (level!=null) set(11,byteArrayOf(mode.code.toByte(),level.toByte()))
-        val current=configs(listOf(11)).getValue(11)
-        if (current.size!=2 || current[0].u()!=mode.code || (level!=null && current[1].u()!=level))
-            throw ProtocolException("Noise readback differs from requested setting")
+        appliedNoise=mode to (level?:appliedNoise?.second?.takeIf { mode!=NoiseMode.OFF }?:0)
     }
     suspend fun preset(preset: EqPreset) = mutex.withLock {
-        set(7,byteArrayOf(preset.code.toByte()))
+        try {
+            set(7,byteArrayOf(preset.code.toByte()))
+        } catch (error: DeviceException) {
+            throw ProtocolException("Earbuds refused ${preset.title} EQ. ${error.message}")
+        }
         if (!configs(listOf(7)).getValue(7).contentEquals(byteArrayOf(preset.code.toByte())))
             throw ProtocolException("EQ readback differs")
     }

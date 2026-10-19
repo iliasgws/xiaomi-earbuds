@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.TouchApp
@@ -23,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -37,7 +37,18 @@ import dev.earbuds.buds.connection.BudsRepository
 import dev.earbuds.buds.connection.BudsState
 import dev.earbuds.buds.connection.ConnectionPhase
 import dev.earbuds.buds.protocol.*
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlin.math.roundToInt
+import dev.earbuds.buds.ui.GlassButton as Button
+import dev.earbuds.buds.ui.GlassButton as FilledTonalButton
+import dev.earbuds.buds.ui.GlassButton as OutlinedButton
+import dev.earbuds.buds.ui.GlassButton as TextButton
+import dev.earbuds.buds.ui.GlassSlider as Slider
+import dev.earbuds.buds.ui.GlassSwitch as Switch
+import dev.earbuds.buds.ui.GlassChoice as FilterChip
+import dev.earbuds.buds.ui.GlassMenuItem as DropdownMenuItem
+import dev.earbuds.buds.ui.GlassDialog as AlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,40 +70,51 @@ fun BudsApp(
         val state by BudsRepository.state.collectAsStateWithLifecycle()
         var tab by remember { mutableIntStateOf(2) }
         val snackbar=remember { SnackbarHostState() }
+        val glass=rememberLayerBackdrop {
+            drawRect(colors.surface)
+            drawContent()
+        }
         LaunchedEffect(state.phase) { if (state.phase==ConnectionPhase.CONNECTED) tab=0 }
         LaunchedEffect(state.message) {
             state.message?.let { snackbar.showSnackbar(it); BudsRepository.clearMessage() }
         }
         Scaffold(
-            snackbarHost={SnackbarHost(snackbar)},
-            topBar={TopAppBar(title={Row(verticalAlignment=Alignment.CenterVertically) {
-                Icon(painterResource(if (dark) R.drawable.ic_makealight_light else R.drawable.ic_makealight_black),
-                    null,Modifier.size(25.dp),tint=Color.Unspecified)
-                Spacer(Modifier.width(12.dp)); Text("Buds",fontWeight=FontWeight.SemiBold)
-            }},actions={StatusChip(state.phase)})},
-            bottomBar={NavigationBar {
-                val tabs = listOf(
-                    Triple("Sound", Icons.Outlined.GraphicEq, Icons.Filled.GraphicEq),
-                    Triple("Gestures", Icons.Outlined.TouchApp, Icons.Filled.TouchApp),
-                    Triple("Device", Icons.Outlined.Headset, Icons.Filled.Headset),
-                )
-                tabs.forEachIndexed { index, (title, outline, filled) ->
-                    NavigationBarItem(selected=tab==index,onClick={tab=index},label={Text(title)},
-                        icon={Icon(if (tab==index) filled else outline,contentDescription=title)})
+            snackbarHost={GlassSnackbarHost(snackbar,glass)},
+            topBar={
+                Box(Modifier.statusBarsPadding().padding(horizontal=16.dp,vertical=8.dp)
+                    .glassChrome(glass)) {
+                    TopAppBar(
+                        title={Row(verticalAlignment=Alignment.CenterVertically) {
+                            Icon(painterResource(if (dark) R.drawable.ic_makealight_light else R.drawable.ic_makealight_black),
+                                null,Modifier.size(25.dp),tint=Color.Unspecified)
+                            Spacer(Modifier.width(12.dp)); Text("Buds",fontWeight=FontWeight.SemiBold)
+                        }},
+                        actions={StatusChip(state.phase)},
+                        colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.Transparent),
+                        windowInsets=WindowInsets(0,0,0,0),
+                    )
                 }
-            }},
+            },
+            bottomBar={
+                Box(Modifier.navigationBarsPadding().padding(horizontal=20.dp,vertical=12.dp)) {
+                    GlassTabs(glass,tab,onSelect={tab=it})
+                }
+            },
         ) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-                .padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                Spacer(Modifier.height(4.dp))
-                if (state.phase==ConnectionPhase.CONNECTING || state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                when(tab) {
-                    0 -> SoundPage(state)
-                    1 -> GesturesPage(state)
-                    else -> DevicePage(state,devices,bluetoothAllowed,notificationsAllowed,promotedAllowed,
-                        savedAddress,requestPermissions,openBluetooth,connect,disconnect,openLiveSettings)
+            // Only the backdrop is recorded. Both glass bars are outside this subtree.
+            GlassControlScene(Modifier.fillMaxSize().layerBackdrop(glass)) {
+                Column(Modifier.fillMaxSize().consumeWindowInsets(padding).verticalScroll(rememberScrollState())
+                    .padding(padding)
+                    .padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                    Spacer(Modifier.height(4.dp))
+                    when(tab) {
+                        0 -> SoundPage(state)
+                        1 -> GesturesPage(state)
+                        else -> DevicePage(state,devices,bluetoothAllowed,notificationsAllowed,promotedAllowed,
+                            savedAddress,requestPermissions,openBluetooth,connect,disconnect,openLiveSettings)
+                    }
+                    Spacer(Modifier.height(20.dp))
                 }
-                Spacer(Modifier.height(20.dp))
             }
         }
     }
@@ -115,7 +137,7 @@ private fun StatusChip(phase: ConnectionPhase) {
 
 @Composable
 private fun EarbudsArtwork() {
-    Box(Modifier.size(116.dp).background(MaterialTheme.colorScheme.primaryContainer,CircleShape)
+    Box(Modifier.size(116.dp).glassChrome(LocalControlBackdrop.current)
         .semantics { contentDescription="Earbuds illustration" },contentAlignment=Alignment.Center) {
         Icon(
             painterResource(if (isSystemInDarkTheme()) R.drawable.ic_makealight_light else R.drawable.ic_makealight_black),
@@ -126,8 +148,7 @@ private fun EarbudsArtwork() {
 
 @Composable
 private fun SectionCard(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Card(shape=RoundedCornerShape(28.dp),colors=CardDefaults.cardColors(
-        containerColor=MaterialTheme.colorScheme.surfaceContainerLow),modifier=Modifier.fillMaxWidth()) {
+    GlassCard(modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Medium)
             subtitle?.let { Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -140,8 +161,7 @@ private fun SectionCard(title: String, subtitle: String? = null, content: @Compo
 private fun BatteryCards(info: DeviceInfo?) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         listOf("Left" to info?.left,"Right" to info?.right,"Case" to info?.case).forEach { (title,battery) ->
-            Card(modifier=Modifier.weight(1f),shape=RoundedCornerShape(24.dp),
-                colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
+            GlassCard(modifier=Modifier.weight(1f)) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     Text(title,style=MaterialTheme.typography.labelLarge)
             Text(battery?.let { "${it.percent}%" } ?: "—",style=MaterialTheme.typography.headlineSmall,
@@ -186,11 +206,10 @@ private fun SoundPage(state: BudsState) {
 @Composable
 private fun NoiseControls(snapshot: Snapshot, enabled: Boolean) {
     SectionCard("Noise control") {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             NoiseMode.entries.forEachIndexed { index,mode ->
-                SegmentedButton(selected=snapshot.mode==mode,enabled=enabled,
+                FilterChip(selected=snapshot.mode==mode,enabled=enabled,modifier=Modifier.weight(1f),
                     onClick={BudsRepository.command { noise(mode) }},
-                    shape=SegmentedButtonDefaults.itemShape(index,NoiseMode.entries.size),
                     label={Text(mode.title,style=MaterialTheme.typography.labelMedium)})
             }
         }
@@ -293,16 +312,11 @@ private fun GesturePicker(title: String, selected: GestureAction, choices: List<
     var expanded by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
         Text(title,style=MaterialTheme.typography.bodyLarge)
-        Box {
-            FilledTonalButton(enabled=enabled,onClick={expanded=true}) {
-                Text(selected.title); Spacer(Modifier.width(4.dp))
-                Icon(Icons.Filled.ArrowDropDown,contentDescription=null)
-            }
-            DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
+        GlassPicker(title=selected.title,expanded=expanded,onToggle={expanded=!expanded},
+            onDismiss={expanded=false},enabled=enabled,modifier=Modifier.weight(1f).padding(start=12.dp)) {
                 choices.forEach { option ->
                     DropdownMenuItem(text={Text(option.title)},onClick={expanded=false;change(option)})
                 }
-            }
         }
     }
 }
@@ -383,16 +397,11 @@ private fun DevicePage(
             Text("Pair your Redmi Buds 6 Pro in Android Bluetooth settings first.")
             Button(onClick=openBluetooth,modifier=Modifier.fillMaxWidth()) { Text("Bluetooth settings") }
         } else {
-            Box(Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick={expanded=true},enabled=!connected && state.phase!=ConnectionPhase.CONNECTING,
-                    modifier=Modifier.fillMaxWidth()) {
-                    Text(chosen?.name ?: "Choose earbuds"); Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Filled.ArrowDropDown,contentDescription=null)
-                }
-                DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
+            GlassPicker(title=chosen?.name ?: "Choose earbuds",expanded=expanded,
+                onToggle={expanded=!expanded},onDismiss={expanded=false},
+                enabled=!connected && state.phase!=ConnectionPhase.CONNECTING,modifier=Modifier.fillMaxWidth()) {
                     devices.forEach { device -> DropdownMenuItem(text={Text(device.name)},
                         onClick={chosen=device;expanded=false}) }
-                }
             }
             Button(onClick={if (connected || state.phase==ConnectionPhase.CONNECTING) disconnect() else chosen?.let { connect(it.address) }},
                 modifier=Modifier.fillMaxWidth(),enabled=chosen!=null) {

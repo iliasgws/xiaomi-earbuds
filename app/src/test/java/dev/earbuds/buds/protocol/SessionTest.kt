@@ -43,6 +43,27 @@ class SessionTest {
         try { EarbudsSession(wire,{factor},10).authenticate(); fail("Expected timeout") }
         catch (_: kotlinx.coroutines.TimeoutCancellationException) { assertTrue(wire.closed) }
     }
+    @Test fun noiseTrustsAckAndReportsLastAppliedMode() = runTest {
+        val gestures=byteArrayOf(4,1,1,1,1,1,2,3,3,3,6,6,5,11,11)
+        val eq=byteArrayOf(1,1,10,5,0,0,1,0,100,0)
+        val configs=byteArrayOf()+
+            configRecord(11,byteArrayOf(0,0))+ // readback still reports the old mode
+            configRecord(7,byteArrayOf(0))+configRecord(2,gestures)+
+            configRecord(37,byteArrayOf(0))+configRecord(59,byteArrayOf(0))+
+            configRecord(41,byteArrayOf(0))+configRecord(55,eq)
+        val wire=ScriptWire(handshake()+listOf(
+            Packet(4,8,3,byteArrayOf()).encode(), // noise write ACK
+            Packet(4,2,4,ProtocolTest.TARGET_PAYLOAD).encode(),
+            Packet(4,0xf3,5,configs).encode(),
+        ))
+        val client=EarbudsSession(wire,{factor})
+        client.authenticate()
+        client.noise(NoiseMode.ANC)
+        val snapshot=client.snapshot()
+        assertEquals(NoiseMode.ANC,snapshot.mode)
+        assertEquals(1,wire.sends.count { it[4].u()==8 })
+        assertFalse(wire.closed)
+    }
     @Test fun chinaModelIsAcceptedWithItsRegion() = runTest {
         val china=ProtocolTest.TARGET_PAYLOAD.copyOf().also {
             val identity=hex("2717509e")

@@ -76,6 +76,7 @@ class EarbudsService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) {
+                if (dev.earbuds.buds.BuildConfig.DEBUG) android.util.Log.w("BudsConnection", "Earbud connection or polling failed", error)
                 val flashed=BudsRepository.consumeFlashCompletion()
                 BudsRepository.session=null
                 if (flashed) BudsRepository.flashSucceeded()

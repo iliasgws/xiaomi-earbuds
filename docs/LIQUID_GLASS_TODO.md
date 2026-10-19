@@ -1,0 +1,24 @@
+# Complete Liquid Glass pass
+
+- [x] Glass section cards, battery tiles, and artwork surface
+- [x] Upstream LiquidButton for all action buttons and selectors
+- [x] Upstream LiquidSlider for ANC, transparency, and custom EQ
+- [x] Upstream LiquidToggle for settings
+- [x] Glass dropdowns and firmware confirmation
+- [x] Independent backdrop layers without self-sampling
+- [x] Disabled controls, accessibility, and command completion preserved in implementation
+- [x] Rename build artifact and HTTP download to Buds-Liquid-Glass.apk
+- [x] Unit tests, lint, and debug build
+- [x] Renamed LAN download verified (HTTP 200 and filename header)
+- [x] Installed and launched on ADB phone c1469691; Device screen captured
+- [x] User confirmed appearance on phone
+- [x] Glass snackbar/error banners with dismiss action and live-region semantics
+- [x] Single-surface morphing pickers, animated size/curvature, retap/Back collapse; no triangle or Close entry
+- [x] Picker pressure scaling, bounded finger-following stretch, spring return, and motion-dependent directional blur (Android 12+)
+- [x] Removed top LinearProgressIndicator loading bar (OTA dialog progress kept)
+- [x] Heavier backdrop blur on error-banner Dismiss (12dp) and action (8dp) buttons
+- [x] Bounded noise readback settling with regression tests; persistent mismatch remains an error
+- [x] Diagnose noise readback: buds apply the change but report a different config 11 value. ACK now trusted; last ACKed mode drives UI (no false error banner)
+- [ ] Diagnose earbud EQ write rejection (0xF2 status 1); not resolved by visual changes
+- [x] Debug logging for caught connection, command, and firmware errors; updated APK installed
+- [ ] Full interaction verification: phone rejects ADB input injection (INJECT_EVENTS)

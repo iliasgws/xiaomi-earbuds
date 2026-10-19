@@ -2,6 +2,10 @@
 
 A native Android controller for **global Redmi Buds 6 Pro**, built with Jetpack
 Compose **Material 3** and wallpaper-derived **Material You** colors.
+Floating Liquid Glass chrome adds backdrop blur, edge refraction, highlights,
+and a responsive, draggable lens on the Sound/Gestures/Device navigation bar.
+This is an Android approximation using [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass),
+not Apple's proprietary renderer or a static glass texture.
 
 ## Features
 
@@ -29,6 +33,10 @@ in `ANDROID_HOME` or local `local.properties`:
 sdk.dir=/path/to/android-sdk
 ```
 
+Backdrop 1.0.0 and ContinuousCapsule 2.1.1 resolve from Maven Central. No
+local library build or Maven Local repository is needed. These releases match
+the app's Kotlin 2.2.21 toolchain.
+
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
@@ -39,20 +47,20 @@ are pinned as well; the first build needs access to Google/Maven repositories.
 Debug APK:
 
 ```text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/liquid-glass/Buds-Liquid-Glass.apk
 ```
 
 Install it with Android Studio, your phone's package installer, or:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/liquid-glass/Buds-Liquid-Glass.apk
 ```
 
 For a phone on the same LAN, you can serve only the APK (no directory browsing):
 
 ```bash
 python3 scripts/serve_apk.py --bind YOUR_COMPUTER_LAN_IP
-# Open http://YOUR_COMPUTER_LAN_IP:8765/buds.apk on the phone.
+# Open http://YOUR_COMPUTER_LAN_IP:8765/Buds-Liquid-Glass.apk on the phone.
 ```
 
 ## Connect
@@ -106,3 +114,33 @@ docs/            Portable protocol reference and verification boundary
 Local reverse-engineering artifacts, phone databases/logs, vendor APKs/libraries,
 machine paths and signing keys are excluded from Git. The committed fixtures
 contain only selected protocol bytes and synthetic/native-replay vectors.
+
+## Glass rendering
+
+The header and functional tab bar share one live backdrop, outside its
+subtree, over a wallpaper-colored gradient and scrolling content. Cards, battery
+tiles, buttons, selectors, sliders, toggles, and expanding menus now use glass.
+Insets keep controls clear of system bars;
+content can scroll behind the floating glass.
+
+- Android 13+: shader refraction, dispersion, blur, and highlights.
+- Android 12: frosted blur and highlights.
+- Android 8–11 (the app's supported older versions): translucent scrim and rim.
+
+The tab bar uses Kyant's actual `LiquidBottomTabs` / `LiquidBottomTab` catalog
+examples: continuous capsule geometry, refracted backdrop plus a second sampled
+icon layer, draggable selection lens, velocity-dependent deformation, animated
+dispersion, inner shadow, and touch-position highlights. The header uses the same
+optical engine with a light surface wash. No neon border or opaque modern-device
+panel is used to stand in for glass. Attribution, pinned source revision, and
+local adaptations are in [third_party/kyant-backdrop](third_party/kyant-backdrop).
+
+Appearance, contrast over scrolling content, drag/tap navigation, and accessibility
+still need physical-device testing on each rendering tier.
+
+Controls use a separate sibling background provider to avoid sampling themselves;
+the header/tab provider records the resulting screen. Menus expand inline to keep
+their backdrop coordinates in the same window. Firmware confirmation uses a local
+glass scene in its dialog window, not a cross-window backdrop capture. The sliders
+retain discrete values, command-on-release for ANC/transparency, and explicit
+Save custom EQ behavior. See [the implementation checklist](docs/LIQUID_GLASS_TODO.md).
