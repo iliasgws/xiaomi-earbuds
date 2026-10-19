@@ -20,5 +20,8 @@
 - [x] Bounded noise readback settling with regression tests; persistent mismatch remains an error
 - [x] Diagnose noise readback: buds apply the change but report a different config 11 value. ACK now trusted; last ACKed mode drives UI (no false error banner)
 - [ ] Diagnose earbud EQ write rejection (0xF2 status 1); not resolved by visual changes
+- [x] Page scroll suspends (and a coasting fling stops) while a finger rests on the ANC/transparency slider
+- [x] Adaptive ANC greys out the strength slider and mirrors the buds' reported level
+- [x] Expanded gesture picker fits all six choices, so "Disabled" is no longer cut off at the bottom
 - [x] Debug logging for caught connection, command, and firmware errors; updated APK installed
 - [ ] Full interaction verification: phone rejects ADB input injection (INJECT_EVENTS)

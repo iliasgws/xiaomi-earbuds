@@ -9,6 +9,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +43,13 @@ import kotlin.math.abs
 import kotlin.math.tanh
 
 internal val LocalControlBackdrop=staticCompositionLocalOf<Backdrop> { error("Missing control backdrop") }
+
+/**
+ * True while a finger is down on a control that drives the page (the noise slider, for
+ * example). The page column reads it and suspends its vertical scroll so dragging a value
+ * never scrolls the screen underneath the finger.
+ */
+internal val LocalPageScrollLock=staticCompositionLocalOf { mutableStateOf(false) }
 
 @Composable
 internal fun GlassSnackbarHost(state: SnackbarHostState, backdrop: Backdrop) {
@@ -111,6 +120,29 @@ private fun Modifier.blockDisabled(enabled: Boolean): Modifier = this
             while(true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
         }
     }
+
+/**
+ * Suspends the enclosing page scroll for as long as a pointer rests on this control, so
+ * adjusting a slider can never scroll the page under the finger. The lock is released when
+ * every pointer lifts, and defensively when the control leaves composition.
+ */
+@Composable
+internal fun Modifier.lockScrollWhilePressed(enabled: Boolean=true): Modifier {
+    val lock=LocalPageScrollLock.current
+    val active by rememberUpdatedState(enabled)
+    DisposableEffect(lock) { onDispose { lock.value=false } }
+    return pointerInput(lock) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed=false)
+            lock.value=active
+            var pressed=true
+            while(pressed) {
+                pressed=awaitPointerEvent().changes.any { it.pressed }
+            }
+            lock.value=false
+        }
+    }
+}
 
 @Composable
 internal fun GlassSlider(value: Float, onValueChange: (Float) -> Unit, enabled: Boolean,
@@ -205,7 +237,9 @@ internal fun GlassPicker(title: String, expanded: Boolean, onToggle: () -> Unit,
             Text(title,color=MaterialTheme.colorScheme.onSurface.copy(alpha=if(enabled) 1f else 0.45f))
         }
         if(expanded) {
-            Column(Modifier.heightIn(max=280.dp).verticalScroll(rememberScrollState()).padding(8.dp),
+            // 336dp fits six 48dp rows plus spacing and padding, so short lists such as the
+            // gesture choices (which end in "Disabled") are never cut off at the bottom.
+            Column(Modifier.heightIn(max=336.dp).verticalScroll(rememberScrollState()).padding(8.dp),
                 verticalArrangement=Arrangement.spacedBy(6.dp),content=content)
         }
     }

@@ -1,6 +1,7 @@
 package dev.earbuds.buds.ui
 
 import android.os.Build
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -78,6 +79,12 @@ fun BudsApp(
         LaunchedEffect(state.message) {
             state.message?.let { snackbar.showSnackbar(it); BudsRepository.clearMessage() }
         }
+        val pageScroll=rememberScrollState()
+        val pageScrollLock=remember { mutableStateOf(false) }
+        // A coasting page must not keep moving under a finger that just grabbed the slider.
+        LaunchedEffect(pageScrollLock.value) {
+            if (pageScrollLock.value) pageScroll.scroll(MutatePriority.PreventUserInput) {}
+        }
         Scaffold(
             snackbarHost={GlassSnackbarHost(snackbar,glass)},
             topBar={
@@ -101,19 +108,23 @@ fun BudsApp(
                 }
             },
         ) { padding ->
-            // Only the backdrop is recorded. Both glass bars are outside this subtree.
-            GlassControlScene(Modifier.fillMaxSize().layerBackdrop(glass)) {
-                Column(Modifier.fillMaxSize().consumeWindowInsets(padding).verticalScroll(rememberScrollState())
-                    .padding(padding)
-                    .padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                    Spacer(Modifier.height(4.dp))
-                    when(tab) {
-                        0 -> SoundPage(state)
-                        1 -> GesturesPage(state)
-                        else -> DevicePage(state,devices,bluetoothAllowed,notificationsAllowed,promotedAllowed,
-                            savedAddress,requestPermissions,openBluetooth,connect,disconnect,openLiveSettings)
+            CompositionLocalProvider(LocalPageScrollLock provides pageScrollLock) {
+                // Only the backdrop is recorded. Both glass bars are outside this subtree.
+                GlassControlScene(Modifier.fillMaxSize().layerBackdrop(glass)) {
+                    // Suspended while a finger rests on the noise slider so value drags never scroll the page.
+                    Column(Modifier.fillMaxSize().consumeWindowInsets(padding)
+                        .verticalScroll(pageScroll,enabled=!pageScrollLock.value)
+                        .padding(padding)
+                        .padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                        Spacer(Modifier.height(4.dp))
+                        when(tab) {
+                            0 -> SoundPage(state)
+                            1 -> GesturesPage(state)
+                            else -> DevicePage(state,devices,bluetoothAllowed,notificationsAllowed,promotedAllowed,
+                                savedAddress,requestPermissions,openBluetooth,connect,disconnect,openLiveSettings)
+                        }
+                        Spacer(Modifier.height(20.dp))
                     }
-                    Spacer(Modifier.height(20.dp))
                 }
             }
         }
@@ -214,20 +225,25 @@ private fun NoiseControls(snapshot: Snapshot, enabled: Boolean) {
             }
         }
         if (snapshot.mode!=NoiseMode.OFF) {
+            // Adaptive ANC picks the strength itself: the slider is read-only and mirrors the
+            // level the buds currently report instead of a leftover local drag value.
+            val adaptive=snapshot.mode==NoiseMode.ANC && snapshot.adaptiveAnc
             var level by remember(snapshot.mode,snapshot.level) { mutableFloatStateOf(snapshot.level.toFloat()) }
             val maximum=if (snapshot.mode==NoiseMode.ANC) 19 else 2
+            val shown=(if (adaptive) snapshot.level.toFloat() else level).coerceIn(0f,maximum.toFloat())
+            val sliderEnabled=enabled && !adaptive
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                 Text(if (snapshot.mode==NoiseMode.ANC) "Strength" else "Transparency")
-                Text(if (snapshot.mode==NoiseMode.ANC) "${level.roundToInt()+1} / 20"
-                    else listOf("Regular","Voice","Ambient")[level.roundToInt().coerceIn(0,2)],
+                Text(if (snapshot.mode==NoiseMode.ANC) "${shown.roundToInt()+1} / 20"
+                    else listOf("Regular","Voice","Ambient")[shown.roundToInt().coerceIn(0,2)],
                     color=MaterialTheme.colorScheme.primary)
             }
-            Slider(value=level.coerceIn(0f,maximum.toFloat()),onValueChange={level=it},enabled=enabled,
+            Slider(value=shown,onValueChange={level=it},enabled=sliderEnabled,
                 valueRange=0f..maximum.toFloat(),steps=maximum-1,
                 onValueChangeFinished={BudsRepository.command { noise(snapshot.mode,level.roundToInt()) }},
-                modifier=Modifier.semantics {
+                modifier=Modifier.lockScrollWhilePressed(enabled=sliderEnabled).semantics {
                     contentDescription="${snapshot.mode.title} strength"
-                    stateDescription="${level.roundToInt()+1} of ${maximum+1}"
+                    stateDescription="${shown.roundToInt()+1} of ${maximum+1}"
                 })
             if (snapshot.mode==NoiseMode.ANC) {
                 SettingSwitch("Adaptive ANC",snapshot.adaptiveAnc,enabled) { BudsRepository.command { toggle(37,it) } }
